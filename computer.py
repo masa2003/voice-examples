@@ -17,15 +17,17 @@
 """
 
 import inspect
-import json
 import logging
 import os
+import string
 import subprocess
+import sys
 import urllib.parse
 from datetime import datetime
 
 import pymorphy3
-from vosk import KaldiRecognizer, Model
+
+from vosk_listener import vosk_listen
 
 
 class Settings:
@@ -41,20 +43,6 @@ logger = logging.getLogger("computer")
 morph = pymorphy3.MorphAnalyzer()
 
 
-def voks_listen(callback):
-    SAMPLE_RATE = 16000
-    listen_cmd = f"ffmpeg -loglevel quiet -f pulse -ar {SAMPLE_RATE} -i default -f s16le -ch_layout mono -"
-
-    model = Model(lang="ru")
-    rec = KaldiRecognizer(model, SAMPLE_RATE)
-
-    with subprocess.Popen(listen_cmd.split(), stdout=subprocess.PIPE) as process:
-        while data := process.stdout.read(4000):
-            if rec.AcceptWaveform(data):
-                if text := json.loads(rec.FinalResult())["text"]:
-                    callback(text)
-
-
 class Context:
     last_action_dt = datetime.now()
     last_action = None
@@ -64,7 +52,7 @@ class Context:
 def do(text):
     logger.debug(f'Текст: "{text}"')
     parts = text.split()
-    norm_parts = [morph.parse(x)[0].normal_form for x in parts]
+    norm_parts = norm_text(text)
     logger.debug(f"Нормализованный текст: {norm_parts}")
 
     if (
@@ -126,6 +114,18 @@ def do(text):
             Context.last_action = method
             Context.last_detail = detail
         return
+
+
+def norm_text(text):
+    parts = text.split()
+    norm_parts = []
+    for word in parts:
+        norm_parts.append(
+            "".join([s.lower() for s in word if s not in string.punctuation])
+        )
+
+    norm_parts = [morph.parse(x)[0].normal_form for x in norm_parts]
+    return norm_parts
 
 
 def filtered_text(parts, norm_parts, remaining_parts):
@@ -318,7 +318,7 @@ class Rename:
         if not detail:
             return
 
-        Settings.computer_name = detail.split()[-1]
+        Settings.computer_name = norm_text(detail)[-1]
         logger.info(f"Новое имя {Settings.computer_name}")
 
     def __repr__(self):
@@ -412,9 +412,17 @@ def text_to_number(text):
 
 
 if __name__ == "__main__":
+    listen = vosk_listen
+
+    for arg in sys.argv:
+        if arg == "--whisper":
+            from whisper_listener import whisper_listen
+
+            listen = whisper_listen
+
     while True:
         try:
-            voks_listen(do)
+            listen(do)
         except KeyboardInterrupt:
             exit()
         except Exception:
