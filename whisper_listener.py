@@ -34,8 +34,8 @@ def whisper_listen(callback):
             if is_silence(waveform, threshold=silence_threshold):
                 if buffer:
                     result = model.transcribe(np.concatenate(buffer), language="ru")
-                    if result["text"].strip():
-                        callback(result["text"].strip())
+                    if text := result["text"].strip():
+                        callback(text)
                     buffer.clear()
             else:
                 buffer.append(waveform)

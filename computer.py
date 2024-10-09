@@ -401,7 +401,11 @@ number_words = {
 
 
 def text_to_number(text):
-    words = text.split()
+    words = norm_text(text)
+    for word in words:
+        if word.isnumeric():
+            return int(word)
+
     result = 0
     for word in words:
         if word in number_words:
