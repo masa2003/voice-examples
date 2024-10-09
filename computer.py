@@ -27,8 +27,6 @@ from datetime import datetime
 
 import pymorphy3
 
-from vosk_listener import vosk_listen
-
 
 class Settings:
     computer_name = "компьютер".lower()
@@ -412,13 +410,18 @@ def text_to_number(text):
 
 
 if __name__ == "__main__":
-    listen = vosk_listen
+    listen = None
 
     for arg in sys.argv:
         if arg == "--whisper":
             from whisper_listener import whisper_listen
 
             listen = whisper_listen
+
+    if not listen:
+        from vosk_listener import vosk_listen
+
+        listen = vosk_listen
 
     while True:
         try:
